@@ -1,0 +1,98 @@
+ hosts: 192.168.43.6
+  tasks:
+  - name: "copy jdk file"
+    copy:
+      src: "/root/jdk-8u171-linux-x64.rpm"
+      dest: "/root/"
+  - name: "copy hadoop file"
+    copy:
+      src: "/root/hadoop-1.2.1-1.x86_64.rpm"
+      dest: "/root/"
+  - name: "install jdk software"
+    package:
+      name: "jdk-8u171-linux-x64.rpm"
+      state: present
+  - name: "install hadoop software"
+    command: "rpm -i hadoop-1.2.1-1.x86_64.rpm --force"
+    register: hadoop_install
+  - debug:
+          var: hadoop_install
+  - name: "creating directory"
+    file:
+      path: "/nm1"
+      state: directory
+      mode: 0755
+  - name: "configure hdfs-site.xml file"
+    template:
+      src: "/etc/hadoop/hdfs-site.xml"
+      dest: "/etc/hadoop/hdfs-site.xml"
+  - name: "configure core-site.xml"
+    template:
+      src: "/etc/hadoop/core-site.xml"
+      dest: "/etc/hadoop/core-site.xml"
+  - name: "checking status of jps service"
+    shell: "jps"
+    register: NameNode
+  - name: "format the NameNode directory"
+    shell: "echo Y | hadoop namenode -format"
+    when: NameNode
+  - name: "stop firewall"
+    command:
+      cmd: "systemctl stop firewalld"
+  - name: "starting namenode"
+    command: "hadoop-daemon.sh start namenode"
+    when: NameNode
+
+- hosts: 192.168.43.198
+  tasks:
+  - name: "copy jdk file"
+    copy:
+      src: "/root/jdk-8u171-linux-x64.rpm"
+      dest: "/root/"
+  - name: "copy hadoop file"
+    copy:
+      src: "/root/hadoop-1.2.1-1.x86_64.rpm"
+      dest: "/root/"
+  - name: "install jdk software"
+    package:
+      name: "jdk-8u171-linux-x64.rpm"
+      state: present
+      disable_gpg_check: yes
+  - name: "install hadoop software"
+    command: "rpm -i hadoop-1.2.1-1.x86_64.rpm --force"
+    register: hadoop_install
+  - debug:
+          var: hadoop_install
+  - name: "creating directory"
+    file:
+      path: "/dm1"
+      state: directory
+      mode: 0755
+  - name: "configure hdfs-site.xml file"
+    blockinfile:
+      path: "/etc/hadoop/hdfs-site.xml"
+      insertafter: "<configuration>"
+      block:
+              <property>
+              <name>dfs.data.dir</name>
+              <value>/dm1</value>
+              </property>
+  - name: "configure core-site.xml"
+    blockinfile:
+      path: "/etc/hadoop/core-site.xml"
+      insertafter: "<configuration>"
+      block:
+              <property>
+              <name>fs.default.name</name>
+              <value>hdfs://192.168.43.6:9001</value>
+              </property>
+  - name: "stop firewall"
+    command:
+      cmd: "systemctl stop firewalld"
+  - name: "checking status of jps service" 
+    shell: "jps"
+    register: DataNode
+  - name: "starting data node service"
+    shell: "hadoop-daemon.sh start datanode"
+    when: DataNode
+
